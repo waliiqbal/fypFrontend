@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { api } from "@/shared/api";
@@ -8,7 +9,7 @@ import type { Specialization } from "@/shared/types";
 import { Avatar, Badge, Button, Card, cx, DataTable, EmptyState, ErrorBox, Field, Input, Loading, Modal, Notice, PageHeader, SearchBox, Tabs, Textarea } from "@/shared/ui";
 import { useAction, useApi } from "@/shared/use-api";
 
-type Doctor = { id: number; name: string; email: string; phone?: string | null; status: string; isVerified: boolean; consultationFee?: number | null; experience?: number | null; licenseNumber?: string | null; profileImage?: string | null; rejectionReason?: string | null; specializations: Specialization[]; _count: { appointments: number } };
+type Doctor = { id: number; name: string; email: string; phone?: string | null; status: string; isVerified: boolean; consultationFee?: number | null; experience?: number | null; licenseNumber?: string | null; profileImage?: string | null; rejectionReason?: string | null; specializations: Specialization[]; department?: { id: number; name: string } | null; _count: { appointments: number } };
 type Status = "" | "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
 
 function HospitalDoctors() {
@@ -41,11 +42,13 @@ function HospitalDoctors() {
           <DataTable rows={data ?? []} rowKey={(d) => d.id} empty={<EmptyState icon="stethoscope" title="No doctors here" />} columns={[
             { header: "Doctor", cell: (d) => <div className="flex items-center gap-3"><Avatar name={d.name} src={d.profileImage} size={40} /><div><p className="font-semibold">Dr. {d.name}</p><p className="text-xs text-copy-muted">{d.email}</p></div></div> },
             { header: "Speciality", cell: (d) => d.specializations.map((s) => s.name).join(", ") || "—" },
+            { header: "Department", cell: (d) => d.department?.name ?? <span className="text-copy-muted">—</span> },
             { header: "Fee", cell: (d) => (d.consultationFee ? rs(d.consultationFee) : "—") },
             { header: "Visits", cell: (d) => d._count.appointments },
             { header: "Status", cell: (d) => <Badge value={d.status === "INACTIVE" && d.isVerified && !d.rejectionReason ? "PENDING" : d.status} label={d.status === "INACTIVE" && d.isVerified && !d.rejectionReason ? "Pending approval" : d.rejectionReason ? "Rejected" : undefined} /> },
             { header: "", className: "text-right", cell: (d) => (
               <div className="flex justify-end gap-1.5">
+                <Link href={`/hospital/doctors/${d.id}`} className="inline-flex h-9 items-center rounded-[13px] px-3 text-sm font-semibold text-brand hover:bg-brand-surface">Details</Link>
                 {d.status === "INACTIVE" && d.isVerified ? (
                   <>
                     <Button className="h-9" icon="check" loading={action.busy === `approve${d.id}`} onClick={() => act(d, "approve", undefined, `Dr. ${d.name} approved – now bookable.`)}>Approve</Button>

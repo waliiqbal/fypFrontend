@@ -38,3 +38,15 @@ export async function getPatientSummary(appointmentId: number) {
 export async function completeAppointment(appointmentId: number) {
   return apiRequest<ApiResponse<unknown>>(`/api/doctors/me/appointments/${appointmentId}/complete`, { method: "PATCH", authenticated: true });
 }
+
+export type ConsultationNotes = { symptoms: string; diagnosis: string; notes: string; advice: string };
+
+export async function getConsultationNotes(appointmentId: number): Promise<ConsultationNotes> {
+  const response = await apiRequest<ApiResponse<{ reason?: string | null; consultation?: Partial<ConsultationNotes> | null }>>(`/api/doctors/me/appointments/${appointmentId}`, { authenticated: true });
+  const c = response.data.consultation;
+  return { symptoms: c?.symptoms ?? response.data.reason ?? "", diagnosis: c?.diagnosis ?? "", notes: c?.notes ?? "", advice: c?.advice ?? "" };
+}
+
+export async function saveConsultationNotes(appointmentId: number, notes: ConsultationNotes) {
+  return apiRequest<ApiResponse<unknown>>(`/api/doctors/me/appointments/${appointmentId}/consultation`, { method: "PUT", authenticated: true, body: notes });
+}

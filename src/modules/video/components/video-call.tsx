@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { completeAppointment, getJoinInfo, getPatientSummary, type DoctorPatientSummary, type JoinInfo } from "../api/video.api";
+import { completeAppointment, getConsultationNotes, getJoinInfo, getPatientSummary, saveConsultationNotes, type ConsultationNotes, type DoctorPatientSummary, type JoinInfo } from "../api/video.api";
 import { useVideoCall } from "../hooks/use-video-call";
 
 const timeFmt = new Intl.DateTimeFormat("en-PK", { dateStyle: "medium", timeStyle: "short" });
@@ -32,7 +32,7 @@ export function VideoCallScreen({ appointmentId, portal }: { appointmentId: numb
 
 function CallRoom({ info, portal, back }: { info: JoinInfo; portal: "patient" | "doctor"; back: string }) {
   const call = useVideoCall(info.appointmentId, info.iceServers);
-  const [panel, setPanel] = useState<"chat" | "brief">(portal === "doctor" ? "brief" : "chat");
+  const [panel, setPanel] = useState<"chat" | "brief" | "notes">(portal === "doctor" ? "brief" : "chat");
   const [showPanel, setShowPanel] = useState(true);
   const [completed, setCompleted] = useState(false);
   const peerLabel = portal === "doctor" ? info.peer.name : `Dr. ${info.peer.name}`;
@@ -133,13 +133,56 @@ function CallRoom({ info, portal, back }: { info: JoinInfo; portal: "patient" | 
             <aside className="flex w-full flex-col rounded-3xl border border-border bg-white lg:w-[360px]">
               <div className="flex gap-1 border-b border-border p-2">
                 {portal === "doctor" && <Tab active={panel === "brief"} onClick={() => setPanel("brief")}>Patient brief</Tab>}
+                {portal === "doctor" && <Tab active={panel === "notes"} onClick={() => setPanel("notes")}>Notes</Tab>}
                 <Tab active={panel === "chat"} onClick={() => setPanel("chat")}>Chat{call.messages.length ? ` (${call.messages.length})` : ""}</Tab>
               </div>
-              {panel === "brief" && portal === "doctor" ? <PatientBrief appointmentId={info.appointmentId} /> : <ChatPanel messages={call.messages} me={info.role} onSend={call.sendChat} />}
+              {panel === "brief" && portal === "doctor" ? <PatientBrief appointmentId={info.appointmentId} /> : panel === "notes" && portal === "doctor" ? <NotesPanel appointmentId={info.appointmentId} /> : <ChatPanel messages={call.messages} me={info.role} onSend={call.sendChat} />}
             </aside>
           )}
         </main>
       )}
+    </div>
+  );
+}
+
+/** Consultation notes the doctor can type while the call is running. Saved to the patient's record. */
+function NotesPanel({ appointmentId }: { appointmentId: number }) {
+  const [notes, setNotes] = useState<ConsultationNotes | null>(null);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    getConsultationNotes(appointmentId).then(setNotes).catch((e: Error) => setError(e.message));
+  }, [appointmentId]);
+
+  async function save() {
+    if (!notes) return;
+    setStatus("saving");
+    try {
+      await saveConsultationNotes(appointmentId, notes);
+      setStatus("saved");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save notes");
+      setStatus("error");
+    }
+  }
+  const set = (k: keyof ConsultationNotes, v: string) => { setStatus("idle"); setError(null); setNotes((n) => (n ? { ...n, [k]: v } : n)); };
+  const field = "mt-1 w-full rounded-xl border border-border bg-surface-input px-3 py-2 text-sm outline-none focus:border-brand";
+
+  if (!notes && !error) return <p className="p-5 text-sm text-copy-muted">Loading notes…</p>;
+  return (
+    <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
+      {notes && (
+        <>
+          <label className="block font-semibold">Symptoms<textarea value={notes.symptoms} onChange={(e) => set("symptoms", e.target.value)} className={`${field} min-h-16`} /></label>
+          <label className="block font-semibold">Diagnosis<input value={notes.diagnosis} onChange={(e) => set("diagnosis", e.target.value)} className={`${field} h-10`} /></label>
+          <label className="block font-semibold">Clinical notes<textarea value={notes.notes} onChange={(e) => set("notes", e.target.value)} className={`${field} min-h-20`} /></label>
+          <label className="block font-semibold">Advice<textarea value={notes.advice} onChange={(e) => set("advice", e.target.value)} className={`${field} min-h-16`} /></label>
+          <button onClick={save} disabled={status === "saving"} className="h-11 w-full rounded-xl bg-brand font-semibold text-white hover:bg-brand-hover disabled:opacity-60">{status === "saving" ? "Saving…" : "Save notes"}</button>
+          {status === "saved" && <p className="text-center text-xs font-semibold text-brand">Notes saved to the patient&apos;s record.</p>}
+          <p className="text-xs text-copy-muted">Add the prescription after the call from the appointment page.</p>
+        </>
+      )}
+      {error && <p className="text-danger">{error}</p>}
     </div>
   );
 }
@@ -175,7 +218,7 @@ function PatientBrief({ appointmentId }: { appointmentId: number }) {
 function ChatPanel({ messages, me, onSend }: { messages: { from: string; name?: string; text: string; at: string }[]; me: string; onSend: (t: string) => void }) {
   const [text, setText] = useState("");
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [messages.length]);
+  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
   return (
     <>
       <div className="flex-1 space-y-3 overflow-y-auto p-4" style={{ maxHeight: "60vh" }}>

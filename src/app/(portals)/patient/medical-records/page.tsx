@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { uploadImage } from "@/shared/extras";
 import { api } from "@/shared/api";
+import { downloadFile } from "@/shared/download";
 import { fmtDate } from "@/shared/format";
 import { Icon } from "@/shared/icons";
 import type { Consultation, MedicalDocument, MedicalProfile, Prescription } from "@/shared/types";
-import { Button, Card, CardHeader, EmptyState, ErrorBox, Field, Input, Loading, Modal, PageHeader, Select, Tabs, Textarea } from "@/shared/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, ErrorBox, Field, Input, Loading, Modal, Notice, PageHeader, Select, Tabs, Textarea } from "@/shared/ui";
 import { useAction, useApi } from "@/shared/use-api";
 
 type Records = {
@@ -57,7 +58,7 @@ export default function MedicalRecords() {
         <div className="grid gap-4 md:grid-cols-2">
           {data.prescriptions.length ? data.prescriptions.map((p) => (
             <Card key={p.id}>
-              <CardHeader title={`Dr. ${p.doctor?.name}`} subtitle={fmtDate(p.createdAt)} />
+              <CardHeader title={`Dr. ${p.doctor?.name}`} subtitle={fmtDate(p.createdAt)} action={<PdfButton path={`/api/patients/me/prescriptions/${p.id}/pdf`} filename={`prescription-${p.id}.pdf`} />} />
               <ul className="flex flex-col gap-2.5">
                 {p.items.map((i, k) => (
                   <li key={k} className="flex gap-3">
@@ -100,8 +101,31 @@ export default function MedicalRecords() {
   );
 }
 
+function PdfButton({ path, filename }: { path: string; filename: string }) {
+  const { busy, error, run } = useAction();
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button variant="secondary" icon="download" className="h-9" loading={busy === "pdf"} onClick={() => run("pdf", () => downloadFile(path, filename))}>PDF</Button>
+      {error && <span className="max-w-48 text-right text-xs text-danger">{error}</span>}
+    </div>
+  );
+}
+
+type Explanation = {
+  fileRead: boolean;
+  summary: string;
+  keyFindings: { name: string; value: string; meaning: string; flag: string }[];
+  questionsForDoctor: string[];
+  disclaimer: string;
+};
+
 function DocumentCard({ doc, onDeleted }: { doc: MedicalDocument; onDeleted: () => void }) {
-  const { busy, run } = useAction();
+  const { busy, error, run } = useAction();
+  const [explanation, setExplanation] = useState<Explanation | null>(null);
+  async function explain() {
+    const r = await run("explain", () => api.post<Explanation>(`/api/patients/me/documents/${doc.id}/explain`));
+    if (r) setExplanation(r.data);
+  }
   return (
     <Card className="flex flex-col gap-3">
       <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="block aspect-[4/3] overflow-hidden rounded-2xl bg-[#f0f7f6]">
@@ -113,6 +137,32 @@ function DocumentCard({ doc, onDeleted }: { doc: MedicalDocument; onDeleted: () 
         <button aria-label="Delete report" disabled={!!busy} onClick={async () => { if (await run("d", () => api.del(`/api/patients/me/documents/${doc.id}`))) onDeleted(); }} className="text-copy-muted hover:text-danger"><Icon name="trash" size={17} /></button>
       </div>
       {doc.notes && <p className="text-[13px] text-copy">{doc.notes}</p>}
+      {doc.aiSummary && !explanation && <p className="line-clamp-3 rounded-xl bg-[#f0f9f8] px-3 py-2 text-xs leading-5 text-[#2d4b4e]"><b>AI summary:</b> {doc.aiSummary}</p>}
+      <Button variant="soft" icon="spark" className="h-10" loading={busy === "explain"} onClick={explain}>{doc.aiSummary ? "Explain again with AI" : "Explain with AI"}</Button>
+      {error && <ErrorBox message={error} />}
+      <Modal open={!!explanation} title={`AI explanation – ${doc.title}`} onClose={() => setExplanation(null)}>
+        {explanation && (
+          <div className="flex flex-col gap-4 text-sm">
+            {!explanation.fileRead && <Notice tone="warn">The report file could not be read, so this is based only on the title and notes you entered.</Notice>}
+            <p className="leading-6">{explanation.summary}</p>
+            {explanation.keyFindings.length > 0 && (
+              <ul className="flex flex-col gap-2">
+                {explanation.keyFindings.map((f, i) => (
+                  <li key={i} className="rounded-[14px] border border-[#eef4f3] p-3">
+                    <div className="flex items-center justify-between gap-2"><b>{f.name}</b><Badge value={f.flag === "normal" ? "ACTIVE" : f.flag === "unknown" ? "INACTIVE" : "PENDING"} label={f.flag} /></div>
+                    <p className="mt-0.5 text-copy-muted">{f.value}</p>
+                    <p className="mt-1">{f.meaning}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {explanation.questionsForDoctor.length > 0 && (
+              <div><p className="font-semibold">Questions to ask your doctor</p><ul className="mt-1 list-disc space-y-1 pl-5">{explanation.questionsForDoctor.map((q) => <li key={q}>{q}</li>)}</ul></div>
+            )}
+            <p className="text-xs text-copy-muted">{explanation.disclaimer}</p>
+          </div>
+        )}
+      </Modal>
     </Card>
   );
 }

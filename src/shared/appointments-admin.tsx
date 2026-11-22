@@ -17,6 +17,7 @@ export function AdminAppointments({ endpoint, mode }: { endpoint: string; mode: 
   const [debounced, setDebounced] = useState("");
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState<Appointment | null>(null);
+  const [reassigning, setReassigning] = useState<Appointment | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   useEffect(() => { const t = setTimeout(() => { setDebounced(q); setPage(1); }, 350); return () => clearTimeout(t); }, [q]);
   const { data, meta, error, loading, reload } = useApi(() => api.get<Appointment[]>(endpoint, { status, paymentStatus, search: debounced, page, limit: 20 }), [status, paymentStatus, debounced, page]);
@@ -53,7 +54,15 @@ export function AdminAppointments({ endpoint, mode }: { endpoint: string; mode: 
             { header: "Status", cell: (a) => <Badge value={a.status} /> },
             { header: "Payment", cell: (a) => <div className="flex flex-col gap-1"><span>{rs(a.consultationFee)}</span><Badge value={a.paymentStatus} className="w-fit" /></div> },
             { header: "", className: "text-right", cell: (a) => {
-              if (mode === "hospital" && (a.status === "PENDING" || a.status === "CONFIRMED")) return <Button variant="danger" className="h-9" onClick={() => setTarget(a)}>Cancel</Button>;
+              if (mode === "hospital" && (a.status === "PENDING" || a.status === "CONFIRMED")) {
+                const upcoming = new Date(a.slot.startAt).getTime() > Date.now();
+                return (
+                  <div className="flex justify-end gap-1.5">
+                    {upcoming && <Button variant="secondary" className="h-9" onClick={() => setReassigning(a)}>Reassign</Button>}
+                    <Button variant="danger" className="h-9" onClick={() => setTarget(a)}>Cancel</Button>
+                  </div>
+                );
+              }
               if (mode === "admin" && a.paymentStatus === "PAID") return <Button variant="secondary" className="h-9" onClick={() => setTarget(a)}>Refund</Button>;
               return null;
             } },
@@ -61,6 +70,7 @@ export function AdminAppointments({ endpoint, mode }: { endpoint: string; mode: 
         )}
       </Card>
       {meta && <Pager page={page} totalPages={meta.totalPages} onPage={setPage} />}
+      <ReassignModal appointment={reassigning} onClose={() => setReassigning(null)} onDone={(m) => { setReassigning(null); setFlash(m); void reload(); }} />
       <ActionModal appointment={target} mode={mode} onClose={() => setTarget(null)} onDone={(m) => { setTarget(null); setFlash(m); void reload(); }} />
     </div>
   );
@@ -81,6 +91,49 @@ function ActionModal({ appointment, mode, onClose, onDone }: { appointment: Appo
       <Notice tone="warn">{isRefund ? `${appointment.patient?.name} gets ${rs(appointment.consultationFee)} back. The doctor's earning for this visit becomes zero.` : `${appointment.patient?.name} will be notified. A pending request is released; a confirmed one is fully refunded.`}</Notice>
       <div className="mt-4"><Field label="Reason"><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field></div>
       {error && <div className="mt-3"><ErrorBox message={error} /></div>}
+    </Modal>
+  );
+}
+
+type DoctorOption = { id: number; name: string; consultationFee?: number | null };
+type FreeSlot = { id: number; startAt: string; endAt: string };
+
+/** Hospital admin moves a pending / confirmed appointment to another doctor of the same hospital. The patient's payment stays as it is. */
+function ReassignModal({ appointment, onClose, onDone }: { appointment: Appointment | null; onClose: () => void; onDone: (msg: string) => void }) {
+  const [doctorId, setDoctorId] = useState("");
+  const [slotId, setSlotId] = useState("");
+  const doctors = useApi(() => api.get<DoctorOption[]>("/api/hospital/doctors", { status: "ACTIVE" }), [appointment?.id]);
+  const slots = useApi(
+    () => (doctorId ? api.get<FreeSlot[]>(`/api/hospital/doctors/${doctorId}/free-slots`) : Promise.resolve({ success: true, message: "", data: [] as FreeSlot[] })),
+    [doctorId],
+  );
+  const { busy, error, run } = useAction();
+  if (!appointment) return null;
+  const options = (doctors.data ?? []).filter((d) => d.id !== appointment.doctorId);
+
+  async function save() {
+    const r = await run("re", () => api.post(`/api/hospital/appointments/${appointment!.id}/reassign`, { doctorId: Number(doctorId), slotId: Number(slotId) }));
+    if (r) onDone(`Appointment moved. ${appointment!.patient?.name} and both doctors were notified.`);
+  }
+
+  return (
+    <Modal key={appointment.id} open title="Reassign to another doctor" onClose={onClose} footer={<Button loading={busy === "re"} disabled={!doctorId || !slotId} onClick={save}>Reassign appointment</Button>}>
+      <Notice tone="info">{appointment.patient?.name} is booked with Dr. {appointment.doctor?.name} on {fmtDateTime(appointment.slot.startAt)}. Pick another doctor and one of their free slots. The patient keeps the same payment and is notified.</Notice>
+      <div className="mt-4 flex flex-col gap-4">
+        <Field label="New doctor">
+          <Select value={doctorId} onChange={(e) => { setDoctorId(e.target.value); setSlotId(""); }}>
+            <option value="">{doctors.loading ? "Loading doctors…" : "Select a doctor"}</option>
+            {options.map((d) => <option key={d.id} value={d.id}>Dr. {d.name}{d.consultationFee ? ` · ${rs(d.consultationFee)}` : ""}</option>)}
+          </Select>
+        </Field>
+        <Field label="Free slot" hint={doctorId && !slots.loading && !(slots.data ?? []).length ? "This doctor has no free upcoming slots." : undefined}>
+          <Select value={slotId} disabled={!doctorId || slots.loading} onChange={(e) => setSlotId(e.target.value)}>
+            <option value="">{slots.loading ? "Loading slots…" : "Select a slot"}</option>
+            {(slots.data ?? []).map((s) => <option key={s.id} value={s.id}>{fmtDateTime(s.startAt)}</option>)}
+          </Select>
+        </Field>
+        {error && <ErrorBox message={error} />}
+      </div>
     </Modal>
   );
 }

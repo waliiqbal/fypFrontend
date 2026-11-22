@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSessionUser } from "@/infrastructure/auth/session-storage";
 import { api } from "@/shared/api";
 import { fmtDateTime, rs } from "@/shared/format";
@@ -21,13 +21,21 @@ type Dashboard = {
   stats: { upcoming: number; pending: number; completed: number; cancelled: number };
 };
 
+const ONBOARDING_SKIPPED_KEY = "askcare.onboarding.skipped";
 const QUICK = ["Headache", "Fever", "Cough", "Skin rash", "Stomach pain", "Back pain"];
 
 export default function PatientDashboard() {
   const router = useRouter();
   const { data, error, loading, reload } = useApi(() => api.get<Dashboard>("/api/patients/me/dashboard"));
+  const tip = useApi(() => api.get<{ tip: string; aiGenerated: boolean }>("/api/patients/me/health-tip"));
   const [symptoms, setSymptoms] = useState("");
   const now = useNow();
+  const needsOnboarding = Boolean(data && !data.healthProfile.completed);
+
+  // First login after sign-up: send the patient to the health form once (they can skip it for this session).
+  useEffect(() => {
+    if (needsOnboarding && !window.sessionStorage.getItem(ONBOARDING_SKIPPED_KEY)) router.replace("/patient/health-profile");
+  }, [needsOnboarding, router]);
   const firstName = (data?.patient.name ?? getSessionUser()?.name ?? "").split(" ")[0];
   const hour = new Date(now).getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -54,6 +62,16 @@ export default function PatientDashboard() {
           <b>Complete your health profile</b> so your AI assistant and doctors know your conditions and allergies.{" "}
           <Link href="/patient/health-profile" className="font-semibold text-brand underline">Add details</Link>
         </Notice>
+      )}
+
+      {tip.data && (
+        <div className="flex items-start gap-3.5 rounded-[22px] border border-[#d3e9e6] bg-[#f0f9f8] p-4 sm:p-5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-white text-brand"><Icon name="heart" size={20} /></span>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[.12em] text-brand">Health tip of the day{tip.data.aiGenerated ? " · AI" : ""}</p>
+            <p className="mt-1 text-sm leading-6 text-[#2d4b4e]">{tip.data.tip}</p>
+          </div>
+        </div>
       )}
 
       <section className="grid gap-5 lg:grid-cols-2">

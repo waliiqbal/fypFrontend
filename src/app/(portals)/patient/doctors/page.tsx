@@ -7,7 +7,7 @@ import { api } from "@/shared/api";
 import { rs } from "@/shared/format";
 import { Icon } from "@/shared/icons";
 import type { DoctorCard, Specialization } from "@/shared/types";
-import { Avatar, Card, EmptyState, ErrorBox, Loading, PageHeader, Pager, SearchBox, Select } from "@/shared/ui";
+import { Avatar, Card, EmptyState, ErrorBox, Loading, PageHeader, Input, Pager, SearchBox, Select } from "@/shared/ui";
 import { useApi } from "@/shared/use-api";
 
 function DoctorsList() {
@@ -19,18 +19,25 @@ function DoctorsList() {
   const [type, setType] = useState("");
   const [hospitalId, setHospitalId] = useState("");
   const [maxFee, setMaxFee] = useState("");
+  const [minRating, setMinRating] = useState("");
+  const [city, setCity] = useState("");
+  const [debouncedCity, setDebouncedCity] = useState("");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     const t = setTimeout(() => { setDebounced(search); setPage(1); }, 350);
     return () => clearTimeout(t);
   }, [search]);
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedCity(city.trim()); setPage(1); }, 400);
+    return () => clearTimeout(t);
+  }, [city]);
 
   const specs = useApi(() => api.public<Specialization[]>("/api/public/specializations"));
   const hospitals = useApi(() => api.public<{ id: number; name: string; city?: string }[]>("/api/public/hospitals"));
   const list = useApi(
-    () => api.public<DoctorCard[]>("/api/doctors", { search: debounced, specializationId, availability, type, hospitalId, maxFee, page, limit: 12 }),
-    [debounced, specializationId, availability, type, hospitalId, maxFee, page],
+    () => api.public<DoctorCard[]>("/api/doctors", { search: debounced, specializationId, availability, type, hospitalId, maxFee, minRating, city: debouncedCity, page, limit: 12 }),
+    [debounced, specializationId, availability, type, hospitalId, maxFee, minRating, debouncedCity, page],
   );
   const selectedSpec = specs.data?.find((s) => String(s.id) === specializationId);
 
@@ -56,6 +63,10 @@ function DoctorsList() {
         <Select aria-label="Maximum fee" value={maxFee} onChange={(e) => { setMaxFee(e.target.value); setPage(1); }} className="mt-0 w-auto">
           <option value="">Any fee</option><option value="1500">Up to Rs 1,500</option><option value="2500">Up to Rs 2,500</option><option value="5000">Up to Rs 5,000</option>
         </Select>
+        <Select aria-label="Minimum rating" value={minRating} onChange={(e) => { setMinRating(e.target.value); setPage(1); }} className="mt-0 w-auto">
+          <option value="">Any rating</option><option value="4.5">4.5 &amp; up</option><option value="4">4 &amp; up</option><option value="3">3 &amp; up</option>
+        </Select>
+        <Input aria-label="City" value={city} onChange={(e) => setCity(e.target.value)} placeholder="City (e.g. Karachi)" className="mt-0 w-44" />
       </Card>
 
       {list.error && <ErrorBox message={list.error} onRetry={list.reload} />}
@@ -78,6 +89,7 @@ function DoctorsList() {
                   {d.experience != null && <span className="rounded-[9px] bg-[#f0f7f6] px-2.5 py-1 text-[#00545a]">{d.experience} yrs exp.</span>}
                   <span className="rounded-[9px] bg-[#f0f7f6] px-2.5 py-1 text-[#00545a]">{d.hospital ? d.hospital.name : "Private practice"}</span>
                   {d.city && <span className="rounded-[9px] bg-[#f0f7f6] px-2.5 py-1 text-[#00545a]">{d.city}</span>}
+                  <span className="inline-flex items-center gap-1 rounded-[9px] bg-[#fff6dc] px-2.5 py-1 text-[#7a5a00]"><Icon name="star" size={13} className="fill-[#f5b301] text-[#f5b301]" />{d.rating?.average ? `${d.rating.average} (${d.rating.count})` : "New"}</span>
                 </div>
                 {d.bio && <p className="line-clamp-2 text-[13px] leading-5 text-copy">{d.bio}</p>}
                 <div className="mt-auto flex items-center justify-between border-t border-[#eef4f3] pt-3.5">

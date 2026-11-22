@@ -21,6 +21,8 @@ const NAV: Record<Portal, NavItem[]> = {
     { href: "/patient/appointments", label: "Appointments", icon: "calendar" },
     { href: "/patient/assistant", label: "My AI Assistant", icon: "chat" },
     { href: "/patient/medical-records", label: "Medical Records", icon: "file" },
+    { href: "/patient/payments", label: "Payments", icon: "money" },
+    { href: "/patient/health-report", label: "Monthly Report", icon: "chart" },
     { href: "/patient/health-profile", label: "Health Profile", icon: "heart" },
   ],
   doctor: [
@@ -28,16 +30,20 @@ const NAV: Record<Portal, NavItem[]> = {
     { href: "/doctor/requests", label: "Requests", icon: "inbox" },
     { href: "/doctor/appointments", label: "Appointments", icon: "calendar" },
     { href: "/doctor/schedule", label: "My Schedule", icon: "clock" },
+    { href: "/doctor/calendar", label: "Calendar", icon: "calendar" },
     { href: "/doctor/patients", label: "Patients", icon: "users" },
-    { href: "/doctor/earnings", label: "Earnings", icon: "money" },
+    { href: "/doctor/earnings", label: "Earnings & Payouts", icon: "money" },
+    { href: "/doctor/reviews", label: "Reviews", icon: "star" },
     { href: "/doctor/profile", label: "Profile", icon: "user" },
   ],
   hospital: [
     { href: "/hospital/dashboard", label: "Dashboard", icon: "dashboard" },
     { href: "/hospital/doctors", label: "Doctors", icon: "stethoscope" },
+    { href: "/hospital/departments", label: "Departments", icon: "tag" },
     { href: "/hospital/appointments", label: "Appointments", icon: "calendar" },
     { href: "/hospital/revenue", label: "Revenue", icon: "money" },
     { href: "/hospital/patients", label: "Patients", icon: "users" },
+    { href: "/hospital/insights", label: "AI Insights", icon: "spark" },
     { href: "/hospital/profile", label: "Hospital Profile", icon: "building" },
   ],
   admin: [
@@ -46,10 +52,11 @@ const NAV: Record<Portal, NavItem[]> = {
     { href: "/admin/doctors", label: "Doctors", icon: "stethoscope" },
     { href: "/admin/patients", label: "Patients", icon: "users" },
     { href: "/admin/appointments", label: "Appointments & Payments", icon: "money" },
+    { href: "/admin/payouts", label: "Doctor Payouts", icon: "money" },
     { href: "/admin/specializations", label: "Specializations", icon: "tag" },
     { href: "/admin/reviews", label: "Reviews", icon: "star" },
     { href: "/admin/ai", label: "AI Monitoring", icon: "spark" },
-    { href: "/admin/settings", label: "Settings & Audit", icon: "settings" },
+    { href: "/admin/settings", label: "Settings, Health & Audit", icon: "settings" },
   ],
 };
 

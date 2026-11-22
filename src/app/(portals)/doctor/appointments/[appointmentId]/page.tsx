@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import { api } from "@/shared/api";
+import { downloadFile } from "@/shared/download";
 import { ageFrom, fmtDateTime, rs } from "@/shared/format";
 import { Icon } from "@/shared/icons";
 import type { Appointment, PrescriptionItem } from "@/shared/types";
@@ -81,6 +82,12 @@ export default function DoctorAppointmentDetail({ params }: { params: Promise<{ 
         <Card>
           <CardHeader title="Consultation notes" subtitle="Visible to the patient in Medical Records" />
           <div className="grid gap-4">
+            {editable && (
+              <SoapAssistant
+                appointmentId={id}
+                onApply={(soap) => { setFlash("AI draft added to the fields below. Review and edit it, then save."); setNotes({ ...notes, symptoms: soap.subjective, notes: soap.objective, diagnosis: soap.assessment, advice: [soap.plan, soap.followUp && `Follow-up: ${soap.followUp}`].filter(Boolean).join("\n") }); }}
+              />
+            )}
             <Field label="Symptoms / complaint"><Textarea disabled={!editable} value={notes.symptoms} onChange={(e) => setNotes({ ...notes, symptoms: e.target.value })} /></Field>
             <Field label="Diagnosis"><Input disabled={!editable} value={notes.diagnosis} onChange={(e) => setNotes({ ...notes, diagnosis: e.target.value })} /></Field>
             <Field label="Clinical notes"><Textarea disabled={!editable} value={notes.notes} onChange={(e) => setNotes({ ...notes, notes: e.target.value })} /></Field>
@@ -119,9 +126,44 @@ export default function DoctorAppointmentDetail({ params }: { params: Promise<{ 
             <div className="flex flex-wrap gap-2">
               <Button variant="soft" icon="spark" disabled={!editable || !validItems.length} loading={action.busy === "check"} onClick={runCheck}>AI safety check</Button>
               <Button disabled={!editable || !validItems.length} loading={action.busy === "rx"} onClick={savePrescription}>Save prescription</Button>
+              {a.prescription && <Button variant="secondary" icon="download" loading={action.busy === "pdf"} onClick={() => action.run("pdf", () => downloadFile(`/api/doctors/me/prescriptions/${a.prescription!.id}/pdf`, `prescription-${a.prescription!.id}.pdf`))}>Download PDF</Button>}
             </div>
           </div>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+type Soap = { subjective: string; objective: string; assessment: string; plan: string; followUp: string };
+
+/** Turns the doctor's rough notes into SOAP fields. Nothing is saved until the doctor reviews and presses Save. */
+function SoapAssistant({ appointmentId, onApply }: { appointmentId: number; onApply: (soap: Soap) => void }) {
+  const [open, setOpen] = useState(false);
+  const [raw, setRaw] = useState("");
+  const [aiDown, setAiDown] = useState(false);
+  const action = useAction();
+
+  async function organise() {
+    setAiDown(false);
+    const r = await action.run("soap", () => api.post<{ soap: Soap; aiGenerated: boolean }>(`/api/ai/doctor/appointments/${appointmentId}/soap`, { rawNotes: raw.trim() }));
+    if (!r) return;
+    setAiDown(!r.data.aiGenerated);
+    onApply(r.data.soap);
+    if (r.data.aiGenerated) setOpen(false);
+  }
+
+  if (!open) return <Button variant="soft" icon="spark" className="w-fit" onClick={() => setOpen(true)}>AI notes assistant (SOAP)</Button>;
+  return (
+    <div className="rounded-[18px] border border-[#d3e9e6] bg-[#f0f9f8] p-4">
+      <p className="flex items-center gap-2 text-sm font-bold text-[#00545a]"><Icon name="spark" size={16} />AI notes assistant</p>
+      <p className="mt-1 text-xs text-copy-muted">Type or paste your rough notes. The assistant organises them into Subjective, Objective, Assessment and Plan. It only rearranges what you wrote.</p>
+      <Textarea aria-label="Rough notes" value={raw} onChange={(e) => setRaw(e.target.value)} placeholder="e.g. 32M, dry cough 3 days, no fever, chest clear, likely viral, fluids + paracetamol, review 1 week" className="mt-3 min-h-24 bg-white" />
+      {action.error && <div className="mt-2"><ErrorBox message={action.error} /></div>}
+      {aiDown && <div className="mt-2"><Notice tone="warn">AI is busy – your notes were placed in the first field unchanged.</Notice></div>}
+      <div className="mt-3 flex gap-2">
+        <Button icon="spark" className="h-10" loading={action.busy === "soap"} disabled={raw.trim().length < 5} onClick={organise}>Organise into SOAP</Button>
+        <Button variant="ghost" className="h-10" onClick={() => setOpen(false)}>Close</Button>
       </div>
     </div>
   );

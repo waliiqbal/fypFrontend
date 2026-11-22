@@ -24,7 +24,7 @@ export default function AssistantPage() {
   const { busy, error, run } = useAction();
   const end = useRef<HTMLDivElement>(null);
 
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [messages.length, busy]);
+  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length, busy]);
 
   async function open(id: number) {
     setActiveId(id);

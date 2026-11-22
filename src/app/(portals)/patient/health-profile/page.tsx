@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { TagInput } from "@/shared/extras";
 import { api } from "@/shared/api";
@@ -13,7 +14,10 @@ export default function HealthProfile() {
   const { data, loading, error } = useApi(() => api.get<MedicalProfile>("/api/patients/me/medical-profile"));
   const [form, setForm] = useFormFrom<MedicalProfile, MedicalProfile>(data, (d) => ({ ...empty, ...d }), empty);
   const [saved, setSaved] = useState(false);
+  const router = useRouter();
   const action = useAction();
+  // The API returns a blank profile (no id) until the patient saves it for the first time.
+  const onboarding = Boolean(data && !("id" in data));
   const set = <K extends keyof MedicalProfile>(k: K, v: MedicalProfile[K]) => { setSaved(false); setForm((f) => ({ ...f, [k]: v })); };
 
   async function save() {
@@ -25,7 +29,15 @@ export default function HealthProfile() {
       lifestyleNotes: form.lifestyleNotes ?? undefined,
       emergencyContact: form.emergencyContact ?? undefined,
     }));
-    if (res) setSaved(true);
+    if (res) {
+      setSaved(true);
+      if (onboarding) router.push("/patient/dashboard");
+    }
+  }
+
+  function skip() {
+    window.sessionStorage.setItem("askcare.onboarding.skipped", "1");
+    router.push("/patient/dashboard");
   }
 
   if (loading) return <Loading />;
@@ -33,6 +45,11 @@ export default function HealthProfile() {
     <div className="max-w-4xl">
       <PageHeader eyebrow="About you" title="Health Profile" description="Your doctors see this before each consultation, and your AI assistant uses it to personalise answers (e.g. diet tips if you have diabetes)." />
       {error && <ErrorBox message={error} />}
+      {onboarding && (
+        <div className="mb-5">
+          <Notice tone="info"><b>Welcome to AskCare!</b> Take a minute to tell us about your health. It helps doctors treat you safely and lets your AI assistant personalise its answers. You can skip this now and finish later.</Notice>
+        </div>
+      )}
       <div className="flex flex-col gap-5">
         <Card>
           <CardHeader title="Conditions & allergies" />
@@ -55,7 +72,7 @@ export default function HealthProfile() {
         </Card>
         {action.error && <ErrorBox message={action.error} />}
         {saved && <Notice tone="success">Saved. Your AI assistant is updating its memory with these details.</Notice>}
-        <div><Button loading={action.busy === "save"} onClick={save} className="px-8">Save health profile</Button></div>
+        <div className="flex flex-wrap gap-3"><Button loading={action.busy === "save"} onClick={save} className="px-8">{onboarding ? "Save & continue" : "Save health profile"}</Button>{onboarding && <Button variant="ghost" onClick={skip}>Skip for now</Button>}</div>
       </div>
     </div>
   );

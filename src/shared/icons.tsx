@@ -31,6 +31,9 @@ const P: Record<string, React.ReactNode> = {
   alert: <><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>,
   menu: <path d="M3 6h18M3 12h18M3 18h18" />,
   trash: <><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></>,
+  download: <><path d="M12 3v12M7 10l5 5 5-5" /><path d="M4 19h16" /></>,
+  key: <><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2L21 2M16 7l3 3M14 9l2 2" /></>,
+  chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
   log: <><path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
 };
 export type IconName = keyof typeof P;
