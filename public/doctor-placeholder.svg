@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-labelledby="title description">
+  <title id="title">Doctor placeholder portrait</title>
+  <desc id="description">A neutral illustrated doctor profile used until real profile images are available.</desc>
+  <defs><linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9eaeb"/><stop offset="1" stop-color="#91bec1"/></linearGradient></defs>
+  <rect width="800" height="600" fill="url(#background)"/>
+  <circle cx="400" cy="235" r="105" fill="#d8a47f"/>
+  <path d="M295 220c12-105 190-132 215 3-39-17-66-59-83-92-18 50-75 91-132 89Z" fill="#26383b"/>
+  <path d="M235 600c12-175 85-243 165-243s153 68 165 243Z" fill="#f8fafb"/>
+  <path d="M326 381l74 110 74-110 35 30-39 189H330l-39-189Z" fill="#dcebed"/>
+  <path d="M400 491v109" stroke="#007d85" stroke-width="16"/>
+  <path d="M326 394c-52 50-55 142 3 178M474 394c52 50 55 142-3 178" fill="none" stroke="#53666c" stroke-width="9"/>
+  <circle cx="329" cy="574" r="19" fill="#53666c"/>
+</svg>

@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+:root {
+  /* Askare design system: change these tokens to update the whole product. */
+  --brand: #007d85;
+  --brand-hover: #006c73;
+  --brand-soft: #d7f3f7;
+  --brand-surface: #edf7f7;
+  --canvas: #f8fafb;
+  --surface: #ffffff;
+  --surface-muted: #eef4f6;
+  --surface-input: #f0f5f7;
+  --ink: #253236;
+  --copy: #53666c;
+  --copy-muted: #6b7e84;
+  --border: #e2e8eb;
+  --danger: #b23535;
+  --danger-soft: #fff0ed;
+  --accent: #985a49;
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --font-app: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --radius-card: 1.5rem;
+  --shadow-card: 0 18px 45px rgb(32 65 70 / 0.07);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-surface: var(--brand-surface);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-input: var(--surface-input);
+  --color-ink: var(--ink);
+  --color-copy: var(--copy);
+  --color-copy-muted: var(--copy-muted);
+  --color-border: var(--border);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-app);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-app);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+select {
+  cursor: pointer;
+}
