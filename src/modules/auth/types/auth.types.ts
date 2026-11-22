@@ -1,5 +1,6 @@
 /** Roles currently supported by the registration API. */
 export type UserType = "patient" | "doctor";
+export type LoginUserType = UserType | "admin";
 
 type CommonRegisterFields = {
   name: string;
@@ -7,7 +8,7 @@ type CommonRegisterFields = {
   password: string;
   phone: string;
   address: string;
-  profileImage: string;
+  profileImage?: string;
 };
 
 export type PatientRegisterPayload = CommonRegisterFields & {
@@ -23,6 +24,7 @@ export type DoctorRegisterPayload = CommonRegisterFields & {
   licenseNumber: string;
   experience: number;
   consultationFee: number;
+  hospitalId?: number;
 };
 
 export type Specialization = {
@@ -52,7 +54,7 @@ export type RegisterResponse = {
 export type LoginPayload = {
   email: string;
   password: string;
-  userType: UserType;
+  userType: LoginUserType;
 };
 
 export type VerifyOtpPayload = {
@@ -67,7 +69,9 @@ export type AuthUser = {
   id: number;
   name: string;
   email: string;
-  role: UserType;
+  role: UserType | "admin";
+  type?: "SUPER_ADMIN" | "HOSPITAL_ADMIN" | "PHARMA_ADMIN";
+  status?: string;
   profileImage?: string | null;
 };
 

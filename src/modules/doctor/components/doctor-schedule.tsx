@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DoctorShell } from "./doctor-shell";
+import { api } from "@/shared/api";
+import { addDaysIso, todayIso } from "@/shared/format";
+import { Button, Card, PageHeader } from "@/shared/ui";
 import {
   createAvailability,
   createScheduleException,
@@ -90,13 +92,12 @@ export function DoctorSchedule() {
   }
 
   return (
-    <DoctorShell activePage="schedule">
-      <main className="px-5 py-10 sm:px-9 lg:px-10 lg:py-12">
-          <p className="text-xs font-bold uppercase tracking-[.16em] text-brand">Practice management</p>
-          <div className="mt-3 flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-4xl font-semibold tracking-[-.045em] sm:text-5xl">My Schedule</h1><p className="mt-3 max-w-2xl text-base leading-7 text-copy-muted">Set regular consultation hours and manage one-time changes to your availability.</p></div><span className="rounded-2xl bg-brand-surface px-5 py-3 text-sm font-semibold text-brand">Pakistan Standard Time</span></div>
-          {(notice || error) && <p className={`mt-7 rounded-2xl px-5 py-4 text-sm font-medium ${error ? "bg-danger-soft text-danger" : "bg-brand-surface text-brand"}`}>{error ?? notice}</p>}
+    <>
+          <PageHeader eyebrow="Practice management" title="My Schedule" description="Set your weekly hours, add time off, then publish bookable slots for patients." actions={<span className="rounded-2xl bg-brand-surface px-4 py-2.5 text-sm font-semibold text-brand">Pakistan Standard Time</span>} />
+          <PublishSlots onDone={(msg) => { setError(null); setNotice(msg); }} onError={setError} />
+          {(notice || error) && <p className={`mb-6 rounded-2xl px-5 py-4 text-sm font-medium ${error ? "bg-danger-soft text-danger" : "bg-brand-surface text-brand"}`}>{error ?? notice}</p>}
 
-          <section className="mt-10 grid gap-7 xl:grid-cols-[minmax(0,1.45fr)_380px]">
+          <section className="grid gap-7 xl:grid-cols-[minmax(0,1.45fr)_380px]">
             <div className="rounded-[1.5rem] bg-white p-5 shadow-[0_18px_45px_rgba(32,65,70,.07)] sm:p-7">
               <div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Weekly availability</h2><p className="mt-1 text-sm text-copy-muted">Your recurring consultation hours.</p></div><span className="text-sm font-semibold text-brand">{availability.filter((rule) => rule.isActive).length} time blocks</span></div>
               {loading ? <ScheduleSkeleton /> : <div className="mt-7 space-y-3">{days.map((day, dayOfWeek) => <DayRow key={day} day={day} rules={availability.filter((rule) => rule.dayOfWeek === dayOfWeek)} onRemove={removeAvailability} />)}</div>}
@@ -109,8 +110,38 @@ export function DoctorSchedule() {
             <form onSubmit={addException} className="rounded-[1.5rem] border border-border bg-white p-6 sm:p-7"><h2 className="text-2xl font-semibold">Time off or extra hours</h2><p className="mt-2 text-sm leading-6 text-copy-muted">Override your weekly schedule for a specific date.</p><label className="mt-6 block text-sm font-semibold">Date<input min={today} type="date" value={exceptionForm.date} onChange={(event) => setExceptionForm((form) => ({ ...form, date: event.target.value }))} className="mt-2 h-12 w-full rounded-xl border border-border px-3 outline-none focus:border-brand" required /></label><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => setExceptionForm((form) => ({ ...form, type: "UNAVAILABLE", startTime: undefined, endTime: undefined }))} className={`rounded-xl px-3 py-3 text-sm font-semibold ${exceptionForm.type === "UNAVAILABLE" ? "bg-brand text-white" : "bg-surface-muted text-copy"}`}>Unavailable</button><button type="button" onClick={() => setExceptionForm((form) => ({ ...form, type: "EXTRA_AVAILABILITY", startTime: form.startTime ?? "09:00", endTime: form.endTime ?? "12:00" }))} className={`rounded-xl px-3 py-3 text-sm font-semibold ${exceptionForm.type === "EXTRA_AVAILABILITY" ? "bg-brand text-white" : "bg-surface-muted text-copy"}`}>Extra hours</button></div>{exceptionForm.type === "EXTRA_AVAILABILITY" && <div className="mt-4 grid grid-cols-2 gap-3"><TimeField label="Start" value={exceptionForm.startTime ?? "09:00"} onChange={(startTime) => setExceptionForm((form) => ({ ...form, startTime }))} /><TimeField label="End" value={exceptionForm.endTime ?? "12:00"} onChange={(endTime) => setExceptionForm((form) => ({ ...form, endTime }))} /></div>}<label className="mt-4 block text-sm font-semibold">Note <span className="font-normal text-copy-muted">(optional)</span><input value={exceptionForm.reason ?? ""} onChange={(event) => setExceptionForm((form) => ({ ...form, reason: event.target.value }))} placeholder="e.g. Medical conference" className="mt-2 h-12 w-full rounded-xl border border-border px-3 outline-none focus:border-brand" /></label><button disabled={submitting !== null} className="mt-6 h-12 w-full rounded-xl border border-brand/30 font-semibold text-brand hover:bg-brand-surface disabled:cursor-not-allowed disabled:opacity-60">{submitting === "exception" ? "Saving…" : "Save schedule change"}</button></form>
             <div className="rounded-[1.5rem] bg-surface-muted p-6 sm:p-7"><div className="flex items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold">Upcoming changes</h2><p className="mt-1 text-sm text-copy-muted">Your planned time away and extra sessions.</p></div><span className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-brand">{exceptions.length} planned</span></div>{loading ? <div className="mt-7 h-32 animate-pulse rounded-2xl bg-white/80" /> : exceptions.length ? <div className="mt-7 space-y-3">{exceptions.map((exception) => <ExceptionRow key={exception.id} exception={exception} onRemove={removeException} />)}</div> : <div className="mt-7 rounded-2xl border border-dashed border-border bg-white/70 p-8 text-center"><p className="font-semibold">No upcoming schedule changes</p><p className="mt-1 text-sm text-copy-muted">Use the form to add time off or extra availability.</p></div>}</div>
           </section>
-      </main>
-    </DoctorShell>
+    </>
+  );
+}
+
+function PublishSlots({ onDone, onError }: { onDone: (msg: string) => void; onError: (msg: string) => void }) {
+  const [days, setDays] = useState(14);
+  const [busy, setBusy] = useState(false);
+  async function publish() {
+    setBusy(true);
+    try {
+      const res = await api.post<{ generated?: number }>("/api/doctors/me/slots/generate", { from: todayIso(), to: addDaysIso(days) });
+      const n = res.data?.generated;
+      onDone(`${n !== undefined ? `${n} slots` : "Slots"} published for the next ${days} days. Patients can now book you.`);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Could not publish slots");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card className="mb-6 flex flex-wrap items-center gap-4 border-[#bfe0dc] bg-[#f3fbfa]">
+      <div className="min-w-[220px] flex-1">
+        <h2 className="text-[17px] font-bold">Publish bookable slots</h2>
+        <p className="mt-1 text-[13px] text-copy-muted">After changing your hours, publish slots so patients can book. Already booked slots are never changed.</p>
+      </div>
+      <label className="text-[13px] font-semibold text-copy">Next
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="ml-2 h-11 rounded-xl border border-border bg-white px-3">
+          <option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option><option value={60}>60 days</option>
+        </select>
+      </label>
+      <Button icon="calendar" loading={busy} onClick={publish}>Publish slots</Button>
+    </Card>
   );
 }
 

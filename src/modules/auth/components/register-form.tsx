@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSpecializations, registerUser } from "@/modules/auth/api/auth.api";
+import { api } from "@/shared/api";
 import type { RegisterPayload, Specialization, UserType } from "@/modules/auth/types/auth.types";
 const inputClass = "mt-2 h-14 w-full rounded-2xl border border-transparent bg-surface-input px-5 text-[15px] text-ink outline-none transition placeholder:text-slate-400 focus:border-brand focus:bg-surface focus:ring-4 focus:ring-brand/10";
 const labelClass = "block text-xs font-bold uppercase tracking-[0.18em] text-slate-600";
@@ -17,7 +18,12 @@ export function RegisterForm() {
   const [selectedSpecializationIds, setSelectedSpecializationIds] = useState<number[]>([]);
   const [isLoadingSpecializations, setIsLoadingSpecializations] = useState(true);
   const [specializationsError, setSpecializationsError] = useState<string | null>(null);
+  const [hospitals, setHospitals] = useState<{ id: number; name: string; city?: string | null }[]>([]);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  useEffect(() => {
+    api.public<{ id: number; name: string; city?: string | null }[]>("/api/public/hospitals").then((r) => setHospitals(r.data)).catch(() => setHospitals([]));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -76,7 +82,6 @@ export function RegisterForm() {
       password: String(form.get("password") ?? ""),
       phone: String(form.get("phone") ?? "").trim(),
       address: String(form.get("address") ?? "").trim(),
-      profileImage: "https://example.com/images/default-profile.png",
     };
 
     const payload: RegisterPayload = userType === "patient"
@@ -94,6 +99,7 @@ export function RegisterForm() {
           licenseNumber: String(form.get("licenseNumber") ?? "").trim(),
           experience: Number(form.get("experience")),
           consultationFee: Number(form.get("consultationFee")),
+          ...(form.get("hospitalId") ? { hospitalId: Number(form.get("hospitalId")) } : {}),
         };
 
     try {
@@ -206,6 +212,7 @@ export function RegisterForm() {
                 <label className={labelClass}>License number<input className={inputClass} name="licenseNumber" placeholder="Medical license ID" required /></label>
                 <label className={labelClass}>Experience (years)<input className={inputClass} name="experience" type="number" min="0" max="70" placeholder="5" required /></label>
                 <label className={labelClass}>Consultation fee<input className={inputClass} name="consultationFee" type="number" min="0" step="0.01" placeholder="2500" required /></label>
+                <label className={`${labelClass} sm:col-span-2`}>Where do you practise?<select className={inputClass} name="hospitalId" defaultValue=""><option value="">Private practice (approved by AskCare)</option>{hospitals.map((h) => <option key={h.id} value={h.id}>{h.name}{h.city ? ` – ${h.city}` : ""} (approved by hospital)</option>)}</select></label>
               </div>
             )}
 

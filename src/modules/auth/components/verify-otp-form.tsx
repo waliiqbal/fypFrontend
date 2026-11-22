@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { saveSession } from "@/infrastructure/auth/session-storage";
+import { homeFor, saveSession } from "@/infrastructure/auth/session-storage";
 import { resendOtp, verifyOtp } from "@/modules/auth/api/auth.api";
 import type { UserType } from "@/modules/auth/types/auth.types";
 import { AuthPageShell } from "./auth-page-shell";
@@ -25,8 +25,12 @@ export function VerifyOtpForm({ initialEmail = "", initialUserType = "patient" }
     const form = new FormData(event.currentTarget);
     try {
       const result = await verifyOtp({ email: email.trim(), userType, otp: String(form.get("otp") ?? "") });
-      saveSession(result.data.token);
-      router.push(result.data.user.role === "patient" ? "/patient/dashboard" : "/doctor/dashboard");
+      {
+        const u = result.data.user;
+        const user = { id: u.id, name: u.name, email: u.email, role: u.role, type: u.type, status: userType === "doctor" ? "INACTIVE" : "ACTIVE", profileImage: u.profileImage };
+        saveSession({ ...result.data.token, user });
+        router.push(homeFor(user));
+      }
     } catch (error) {
       setFeedback({ type: "error", message: error instanceof Error ? error.message : "OTP verification failed." });
     } finally {

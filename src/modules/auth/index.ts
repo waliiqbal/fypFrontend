@@ -1,6 +1,5 @@
 export { RegisterForm } from "./components/register-form";
 export { LoginForm } from "./components/login-form";
-export { ProfileView } from "./components/profile-view";
 export { VerifyOtpForm } from "./components/verify-otp-form";
 export {
   getProfile,
