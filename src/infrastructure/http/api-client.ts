@@ -24,11 +24,17 @@ export async function apiRequest<T>(
   const response = await fetch(`${env.apiBaseUrl}${endpoint}`, {
     ...requestOptions,
     headers: {
-      "Content-Type": "application/json",
+      // For FormData the browser must set the multipart boundary itself.
+      ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body:
+      options.body === undefined
+        ? undefined
+        : options.body instanceof FormData
+          ? options.body
+          : JSON.stringify(options.body),
   });
 
   const data = (await response.json().catch(() => ({}))) as T & ErrorResponse;

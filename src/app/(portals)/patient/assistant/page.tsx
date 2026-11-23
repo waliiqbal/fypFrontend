@@ -9,9 +9,11 @@ import { Button, cx, ErrorBox, LinkButton, Loading } from "@/shared/ui";
 import { useAction, useApi } from "@/shared/use-api";
 
 type Conversation = { id: number; title: string; updatedAt: string };
-type Message = { id: number; role: "USER" | "ASSISTANT"; content: string; urgency?: string | null; sources?: { sourceType: string; sourceId: string; preview: string }[] | null; createdAt: string };
+type Message = { preview?: string; id: number; role: "USER" | "ASSISTANT"; content: string; urgency?: string | null; sources?: { sourceType: string; sourceId: string; preview: string }[] | null; createdAt: string };
 type Reply = { message: Message; urgency: string; followUpQuestions: string[]; suggestBooking: boolean; disclaimer: string };
 
+const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const STARTERS = ["What should I eat with my condition?", "Explain my last prescription", "When is my next follow-up?", "Is my blood pressure medicine safe with paracetamol?"];
 const sourceLabel: Record<string, string> = { profile: "Health profile", consultation: "Consultation note", prescription: "Prescription", document: "Report" };
 
@@ -21,6 +23,9 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [extras, setExtras] = useState<Record<number, Reply>>({});
   const [text, setText] = useState("");
+  const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
   const { busy, error, run } = useAction();
   const end = useRef<HTMLDivElement>(null);
 
@@ -32,9 +37,25 @@ export default function AssistantPage() {
     if (res) setMessages(res.data.messages);
   }
 
+  function pickPhoto(file?: File) {
+    setPhotoError("");
+    if (!file) return;
+    if (!PHOTO_TYPES.includes(file.type)) return setPhotoError("Please choose a JPG, PNG or WebP photo.");
+    if (file.size > MAX_PHOTO_BYTES) return setPhotoError("Photo is too large (max 4 MB).");
+    if (photo) URL.revokeObjectURL(photo.url);
+    setPhoto({ file, url: URL.createObjectURL(file) });
+  }
+
+  function clearPhoto() {
+    if (photo) URL.revokeObjectURL(photo.url);
+    setPhoto(null);
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
   async function send(content = text) {
     const message = content.trim();
-    if (!message) return;
+    const attached = photo;
+    if (!message && !attached) return;
     let id = activeId;
     if (!id) {
       const created = await run("new", () => api.post<Conversation>("/api/ai/chat/conversations", { title: message.slice(0, 60) }));
@@ -44,8 +65,14 @@ export default function AssistantPage() {
       void conversations.reload();
     }
     setText("");
-    setMessages((m) => [...m, { id: -Date.now(), role: "USER", content: message, createdAt: new Date().toISOString() }]);
-    const res = await run("send", () => api.post<Reply>(`/api/ai/chat/conversations/${id}/messages`, { message }));
+    setPhoto(null);
+    if (fileInput.current) fileInput.current.value = "";
+    // The photo is only kept in this browser tab for display; the server never stores it.
+    setMessages((m) => [...m, { id: -Date.now(), role: "USER", content: message, preview: attached?.url, createdAt: new Date().toISOString() }]);
+    const form = new FormData();
+    if (message) form.append("message", message);
+    if (attached) form.append("image", attached.file);
+    const res = await run("send", () => api.postForm<Reply>(`/api/ai/chat/conversations/${id}/messages`, form));
     if (res) {
       setMessages((m) => [...m, res.data.message]);
       setExtras((e) => ({ ...e, [res.data.message.id]: res.data }));
@@ -95,7 +122,10 @@ export default function AssistantPage() {
           {messages.map((m) => {
             const extra = extras[m.id];
             return m.role === "USER" ? (
-              <div key={m.id} className="ml-auto max-w-[80%] whitespace-pre-wrap rounded-[18px_18px_4px_18px] bg-brand px-4 py-3 text-sm text-white">{m.content}</div>
+              <div key={m.id} className="ml-auto max-w-[80%] whitespace-pre-wrap rounded-[18px_18px_4px_18px] bg-brand px-4 py-3 text-sm text-white">
+                {m.preview && <img src={m.preview} alt="Photo you sent" className="mb-2 max-h-56 rounded-xl object-cover" />}
+                {m.content}
+              </div>
             ) : (
               <div key={m.id} className="flex max-w-[88%] flex-col gap-2">
                 {m.urgency && (m.urgency === "EMERGENCY" || m.urgency === "URGENT") && <UrgencyBanner urgency={m.urgency} />}
@@ -111,12 +141,23 @@ export default function AssistantPage() {
           <div ref={end} />
         </div>
         <form onSubmit={(e) => { e.preventDefault(); void send(); }} className="border-t border-[#eef4f3] p-3">
+          {photo && (
+            <div className="mb-2 flex items-center gap-3 rounded-[14px] bg-[#f0f7f6] p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo.url} alt="Selected photo" className="h-14 w-14 rounded-lg object-cover" />
+              <p className="min-w-0 flex-1 truncate text-xs text-copy-muted">{photo.file.name}</p>
+              <button type="button" aria-label="Remove photo" onClick={clearPhoto} className="px-2 opacity-60 hover:opacity-100"><Icon name="x" size={16} /></button>
+            </div>
+          )}
+          {photoError && <p role="alert" className="mb-2 px-2 text-xs font-semibold text-[#b42318]">{photoError}</p>}
           <div className="flex items-center gap-2 rounded-[16px] border border-[#dcebe8] px-2 py-1.5 focus-within:border-brand">
+            <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => pickPhoto(e.target.files?.[0])} />
+            <button type="button" aria-label="Attach photo" title="Attach a photo (JPG, PNG, WebP · max 4 MB)" onClick={() => fileInput.current?.click()} className="flex h-10 w-10 items-center justify-center rounded-[12px] text-brand hover:bg-brand-surface"><Icon name="plus" size={18} /></button>
             <label htmlFor="assistant-input" className="sr-only">Message</label>
-            <input id="assistant-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask about your health…" className="h-10 flex-1 bg-transparent px-2 text-sm outline-none" />
-            <button aria-label="Send" disabled={!text.trim() || busy === "send"} className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-brand text-white disabled:opacity-40"><Icon name="arrow" size={18} /></button>
+            <input id="assistant-input" value={text} onChange={(e) => setText(e.target.value)} placeholder={photo ? "Add a question about this photo (optional)…" : "Ask about your health…"} className="h-10 flex-1 bg-transparent px-2 text-sm outline-none" />
+            <button aria-label="Send" disabled={(!text.trim() && !photo) || busy === "send"} className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-brand text-white disabled:opacity-40"><Icon name="arrow" size={18} /></button>
           </div>
-          <p className="mt-1.5 px-2 text-[11px] text-copy-muted">AI guidance only – not a medical diagnosis. Never change medicines without your doctor.</p>
+          <p className="mt-1.5 px-2 text-[11px] text-copy-muted">AI guidance only – not a medical diagnosis. Photos are sent to the AI for this reply and are not saved. Never change medicines without your doctor.</p>
         </form>
       </section>
     </div>

@@ -16,6 +16,7 @@ export const api = {
   get: <T>(path: string, params?: Record<string, string | number | boolean | undefined | null>) =>
     apiRequest<ApiEnvelope<T>>(`${path}${toQuery(params)}`, { authenticated: true }),
   post: <T>(path: string, body?: unknown) => apiRequest<ApiEnvelope<T>>(path, { method: "POST", body: body ?? {}, authenticated: true }),
+  postForm: <T>(path: string, body: FormData) => apiRequest<ApiEnvelope<T>>(path, { method: "POST", body, authenticated: true }),
   put: <T>(path: string, body?: unknown) => apiRequest<ApiEnvelope<T>>(path, { method: "PUT", body: body ?? {}, authenticated: true }),
   patch: <T>(path: string, body?: unknown) => apiRequest<ApiEnvelope<T>>(path, { method: "PATCH", body: body ?? {}, authenticated: true }),
   del: <T>(path: string) => apiRequest<ApiEnvelope<T>>(path, { method: "DELETE", authenticated: true }),
